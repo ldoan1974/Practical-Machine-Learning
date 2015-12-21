@@ -1,0 +1,136 @@
+---
+title: "Pratical Machine Learning Class - Course Project Writeup"
+author: "Luc Doan"
+date: "Friday, December 18, 2015"
+output: html_document
+---
+
+### Executive Summary
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+### Loading required libraries
+
+```{r cache=TRUE, echo=TRUE}
+library(caret)
+library(randomForest)
+library(ggplot2)
+```
+
+### Down load files 
+```{r cache=TRUE, echo=TRUE}
+train_url <- "http://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+download.file(url=train_url, destfile="training.csv")
+test_url <- "http://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+download.file(url=test_url, destfile="testing.csv")
+
+#read training and testing file
+trainfile <- read.csv("training.csv", na.strings=c("NA","#DIV/0!",""))
+testfile <- read.csv("testing.csv", na.strings=c("NA","#DIV/0!",""))
+
+names(trainfile)
+str(trainfile)
+summary(trainfile)
+summary(trainfile$classe)
+```
+
+### Separate train/test files
+Before we do anything, we will set aside a subset of our training data for cross validation (40%).
+
+```{r cache=TRUE, echo=TRUE}
+
+inTrain <- createDataPartition(y=trainfile$classe, p=0.6, list=FALSE)
+myTrain <- trainfile[inTrain, ]
+myTest <- trainfile[-inTrain, ]
+
+dim(myTrain)
+dim(myTest)
+```
+
+
+
+### Feature selection
+We now transform the data which includes the variables we need to build model. We will remove variables with zero variance, variables with missing data, and variables that are obviously not useful as predictors.
+
+```{r cache=TRUE, echo=TRUE}
+#We remove variables with mostly NAs (use threshold of >75%)
+mytrain_NAS <- myTrain
+for (i in 1:length(myTrain)) {
+  if (sum(is.na(myTrain[ , i])) / nrow(myTrain) >= .75) {
+    for (j in 1:length(mytrain_NAS)) {
+      if (length(grep(names(myTrain[i]), names(mytrain_NAS)[j]))==1) {
+        mytrain_NAS <- mytrain_NAS[ , -j]
+      }
+    }
+  }
+}
+
+dim(mytrain_NAS)
+```
+
+```{r cache=TRUE, echo=TRUE}
+#remove columns which is not predictors
+mytrain_NAS2 <- mytrain_NAS[,8:length(mytrain_NAS)]
+
+#remove variables which zero variance
+CLE <- nearZeroVar(mytrain_NAS2, saveMetrics = TRUE)
+CLE 
+```
+
+```{r cache=TRUE, echo=TRUE}
+keep <- names(mytrain_NAS2)
+```
+
+### Random Forest Model
+Random forest model should be used to build the machine learning algorithm as it is appropriate for a classification problem. This model tends is more accurate than some other classification models.
+
+I will apply my model on training data and then use model to predict classe on subset of data used for cross validation.
+
+```{r cache=TRUE, echo=TRUE}
+#fit model- RANDOM FOREST
+set.seed(223)
+
+modFit <- randomForest(classe~., data = mytrain_NAS2)
+print(modFit)
+```
+
+```{r cache=TRUE, echo=TRUE}
+#out of sample error
+predict1 <- predict(modFit, myTest, type = "class")
+confusionMatrix(predict1, myTest$classe)
+```
+
+```{r cache=TRUE, echo=TRUE}
+#in sample error
+predict_train <- predict(modFit, myTrain, type = "class")
+confusionMatrix(myTrain$classe, predict_train)
+```
+
+### Error
+As we can see from the model summaries above, when we run the model on our test data for cross validation we get an accuracy of 99.4% that we can estimate to be our out of sample error. When the model is fitted to the training data used to build the model it shows 100% accuracy, which we can assume as our in sample error.
+
+Based on summaries, when we run the model on test data for cross validation we get an accuracy of 99.4% that we can estimate to be our out of sample error. When the model is fitted to the training data used to build the model it shows 100% accuracy, which we can assume as our in sample error.
+
+### Apply to final test set
+Finally, we apply our model to the final test data. Upon submission all predictions were correct!
+
+
+```{r cache=TRUE, echo=TRUE}
+predict_FINAL <- predict(modFit, testfile, type = "class")
+print(predict_FINAL)
+```
+
+```{r cache=TRUE, echo=TRUE}
+pml_write_files = function(x) {
+  n = length(x)
+  for (i in 1:n) {
+    filename = paste0("problem_id_", i, ".txt")
+    write.table(x[i], file=filename, quote=FALSE,row.names=FALSE, col.names=FALSE)
+  }
+}
+
+pml_write_files(predict_FINAL)
+```
+
+
+
+

@@ -1,5 +1,5 @@
 ---
-title: "Pratical Machine Learning Class - Course Project Writeup"
+title: "Pratical Machine Learning Class - Course Project 1 Writeup"
 author: "Luc Doan"
 date: "Friday, December 18, 2015"
 output: html_document
